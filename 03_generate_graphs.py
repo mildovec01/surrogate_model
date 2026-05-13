@@ -1,9 +1,3 @@
-"""
-Generátor grafů pro plakát / prezentaci
-Vyžaduje nejdřív spustit 01 a 02.
-Výstup: results/grafy/*.png  (300 DPI)
-"""
-
 import numpy as np
 import pandas as pd
 import joblib

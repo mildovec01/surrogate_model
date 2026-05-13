@@ -1,10 +1,3 @@
-"""
-Generátor simulačních dat pro zemědělský robot
-==============================================
-Simuluje realistická data ze senzorů bez nutnosti 3D enginu.
-Fyzika je zjednodušená ale věrohodná pro trénink surrogate modelu.
-"""
-
 import numpy as np
 import pandas as pd
 from pathlib import Path

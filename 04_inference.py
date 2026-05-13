@@ -1,8 +1,3 @@
-"""
-Surrogate Model — Real-time inference
-Tento modul načteš do ROS2 nodu nebo HMI backendu.
-"""
-
 import numpy as np
 import joblib
 import time
