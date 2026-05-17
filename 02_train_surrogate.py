@@ -153,3 +153,4 @@ def compute_learning_curves(csv_path="data/robot_simulation.csv"):
 if __name__ == "__main__":
     results = train_all()
     lc = compute_learning_curves()
+    

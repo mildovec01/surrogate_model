@@ -62,29 +62,40 @@ def generate_rgbd(n):
 
 
 def compute_labels(lidar_min, lidar_N, depth_min, imu_pitch, imu_roll,
-                   soil_moisture, soil_ph, rtk_fix):
+                   soil_moisture, soil_ph, rtk_fix, n):
+
+    env_noise = np.random.normal(0, 0.04, n)
+
     collision_risk = np.clip(
         0.8 * np.exp(-lidar_min / 1.5) +
         0.15 * np.exp(-depth_min / 1.0) +
-        0.05 * (np.abs(imu_roll) > 10).astype(float),
+        0.05 * (np.abs(imu_roll) > 10).astype(float) +
+        env_noise,                          # ← šum
         0.0, 1.0
     )
+    outlier_mask = np.random.random(n) < 0.03
+    collision_risk[outlier_mask] = np.random.uniform(0, 1, outlier_mask.sum())
 
     speed = np.clip(
         0.6 * (lidar_N / 12.0) *
         (1 - 0.4 * np.abs(imu_pitch) / 20) *
         (1 - 0.3 * collision_risk) *
-        (rtk_fix == 4).astype(float) * 0.3 + 0.7,
+        ((rtk_fix == 4).astype(float) * 0.3 + 0.7) +
+        np.random.normal(0, 0.03, n),     
         0.0, 1.0
     )
 
-    needs_treatment = (
-        (soil_moisture < 0.3) |
-        (soil_ph < 5.8) |
-        (soil_ph > 7.5)
-    ).astype(float)
+    treatment_score = (
+        np.clip((0.3 - soil_moisture) / 0.15, 0, 1) * 0.5 +
+        np.clip((5.8 - soil_ph) / 0.5, 0, 1) * 0.3 +
+        np.clip((soil_ph - 7.5) / 0.5, 0, 1) * 0.2
+    )
+    treatment_score += np.random.normal(0, 0.08, n)
+    needs_treatment = (treatment_score > 0.3).astype(float)
 
     nav_quality = (rtk_fix == 4).astype(float)
+    multipath_mask = (rtk_fix == 4) & (np.random.random(n) < 0.05)
+    nav_quality[multipath_mask] = 0.0      # ← falešný dobrý fix
 
     return collision_risk, speed, needs_treatment, nav_quality
 
@@ -100,7 +111,8 @@ def generate_dataset(n=N):
 
     collision_risk, speed, needs_treatment, nav_quality = compute_labels(
         lidar["lidar_min"], lidar["lidar_N"], depth_min,
-        imu_pitch, imu_roll, soil_moisture, soil_ph, rtk_fix
+        imu_pitch, imu_roll, soil_moisture, soil_ph, rtk_fix,
+        n
     )
 
     df = pd.DataFrame({

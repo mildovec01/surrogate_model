@@ -5,27 +5,24 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from pathlib import Path
+from sklearn.metrics import confusion_matrix
 
 Path("results/grafy").mkdir(parents=True, exist_ok=True)
 
 plt.rcParams.update({
-    "font.family":      "DejaVu Sans",
-    "font.size":        11,
-    "axes.titlesize":   13,
-    "axes.labelsize":   11,
-    "axes.spines.top":   False,
-    "axes.spines.right": False,
-    "figure.dpi":       150,
-    "savefig.dpi":      300,
-    "savefig.bbox":     "tight",
+    "font.family":       "DejaVu Sans",
+    "font.size":         12,
+    "axes.titlesize":    13,
+    "axes.labelsize":    12,
+    "axes.spines.top":   True,
+    "axes.spines.right": True,
+    "figure.dpi":        100,
+    "savefig.dpi":       300,
+    "savefig.bbox":      "tight",
+    "lines.linewidth":   1.5,
+    "grid.alpha":        0.4,
+    "grid.linestyle":    "--",
 })
-
-COLORS = {
-    "primary":   "#2D6A4F",
-    "secondary": "#52B788",
-    "accent":    "#F4A261",
-    "neutral":   "#495057",
-}
 
 FEATURES = [
     "rtk_x", "rtk_y", "rtk_fix",
@@ -37,228 +34,281 @@ FEATURES = [
     "depth_center", "depth_min", "cam_obstacle",
 ]
 
-RENAME = {
-    "lidar_min":         "LiDAR – min. vzdálenost",
-    "lidar_N":           "LiDAR – sever (přímý)",
-    "lidar_front_clear": "LiDAR – volná cesta",
-    "lidar_NE":          "LiDAR – severovýchod",
-    "lidar_NW":          "LiDAR – severozápad",
-    "depth_min":         "RGB-D – min. hloubka",
-    "depth_center":      "RGB-D – střed záběru",
-    "cam_obstacle":      "RGB-D – překážka",
-    "imu_pitch":         "IMU – náklon dopředu",
-    "imu_roll":          "IMU – boční náklon",
-    "soil_moisture":     "Vlhkost půdy",
-    "soil_ph":           "pH půdy",
-    "rtk_x":             "RTK GNSS – X",
-    "rtk_y":             "RTK GNSS – Y",
-    "rtk_fix":           "RTK – kvalita fixu",
-}
 
+def plot_scatter_collision(results):
+    y_test = results["out_collision_risk"]["y_test"]
+    y_pred = results["out_collision_risk"]["y_pred"]
+    r2     = results["out_collision_risk"]["r2"]
 
-def plot_feature_importance(results):
-    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
-    fig.suptitle("Důležitost vstupních senzorů (Feature Importance)",
-                 fontsize=14, fontweight="bold")
+    idx = np.random.choice(len(y_test), 800, replace=False)
+    yt, yp = y_test[idx], y_pred[idx]
 
-    for ax, target, title in zip(
-        axes,
-        ["out_collision_risk", "out_speed"],
-        ["Predikce rizika kolize", "Predikce optimální rychlosti"]
-    ):
-        fi = pd.Series(results[target]["feature_importance"]).nlargest(10)
-        labels = [RENAME.get(k, k) for k in fi.index]
-        vals   = fi.values
-
-        bars = ax.barh(labels[::-1], vals[::-1],
-                       color=COLORS["primary"], alpha=0.85, height=0.6)
-        for bar, val in zip(bars, vals[::-1]):
-            ax.text(val + 0.003, bar.get_y() + bar.get_height()/2,
-                    f"{val:.3f}", va="center", fontsize=9)
-
-        ax.set_title(title, fontweight="bold", pad=10)
-        ax.set_xlabel("Relativní důležitost")
-        ax.set_xlim(0, vals.max() * 1.2)
-        ax.tick_params(axis="y", labelsize=9)
-
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.scatter(yt, yp, s=8, alpha=0.4, color="steelblue", label="Vzorky")
+    ax.plot([0, 1], [0, 1], "r--", linewidth=1.2, label="Ideální shoda")
+    ax.set_xlabel("Skutečná hodnota (simulace)")
+    ax.set_ylabel("Predikce (surrogate model)")
+    ax.set_title(f"Riziko kolize — predikce vs. realita  (R² = {r2:.3f})")
+    ax.set_xlim(-0.05, 1.05)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_xticks(np.arange(0, 1.2, 0.2))
+    ax.set_yticks(np.arange(0, 1.2, 0.2))
+    ax.legend(fontsize=10)
+    ax.grid(True)
     plt.tight_layout()
-    plt.savefig("results/grafy/01_feature_importance.png")
+    plt.savefig("results/grafy/01_scatter_collision.png")
     plt.close()
-    print("✓ 01_feature_importance.png")
+    print("✓ 01_scatter_collision.png")
 
 
-def plot_learning_curves(lc_results):
-    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
-    fig.suptitle("Learning Curves — kolik dat surrogate potřebuje?",
-                 fontsize=14, fontweight="bold")
+def plot_scatter_speed(results):
+    y_test = results["out_speed"]["y_test"]
+    y_pred = results["out_speed"]["y_pred"]
+    r2     = results["out_speed"]["r2"]
 
-    rename_target = {
-        "out_collision_risk":  ("Riziko kolize (R²)", "R² skóre"),
-        "out_needs_treatment": ("Potřeba ošetření půdy (přesnost)", "Přesnost (%)"),
+    idx = np.random.choice(len(y_test), 800, replace=False)
+    yt, yp = y_test[idx], y_pred[idx]
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.scatter(yt, yp, s=8, alpha=0.4, color="steelblue", label="Vzorky")
+    ax.plot([0, 1], [0, 1], "r--", linewidth=1.2, label="Ideální shoda")
+    ax.set_xlabel("Skutečná hodnota (simulace)")
+    ax.set_ylabel("Predikce (surrogate model)")
+    ax.set_title(f"Optimální rychlost — predikce vs. realita  (R² = {r2:.3f})")
+    ax.set_xlim(-0.05, 1.05)
+    ax.set_ylim(-0.05, 1.05)
+    ax.set_xticks(np.arange(0, 1.2, 0.2))
+    ax.set_yticks(np.arange(0, 1.2, 0.2))
+    ax.legend(fontsize=10)
+    ax.grid(True)
+    plt.tight_layout()
+    plt.savefig("results/grafy/02_scatter_speed.png")
+    plt.close()
+    print("✓ 02_scatter_speed.png")
+
+
+def plot_lc_collision(lc_results):
+    lc = lc_results["out_collision_risk"]
+    sizes = lc["train_sizes"]
+    train = lc["train_scores_mean"]
+    test  = lc["test_scores_mean"]
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.plot(sizes, train, "o-", color="steelblue", label="Tréninková sada")
+    ax.plot(sizes, test,  "s-", color="darkorange", label="Testovací sada")
+    ax.set_xlabel("Počet trénovacích vzorků")
+    ax.set_ylabel("R² skóre")
+    ax.set_title("Learning curve — riziko kolize")
+    ax.set_ylim(0, 1.05)
+    ax.set_yticks(np.arange(0, 1.2, 0.2))
+    ax.legend(fontsize=10)
+    ax.grid(True)
+    plt.tight_layout()
+    plt.savefig("results/grafy/03_lc_collision.png")
+    plt.close()
+    print("✓ 03_lc_collision.png")
+
+
+def plot_lc_treatment(lc_results):
+    lc = lc_results["out_needs_treatment"]
+    sizes = lc["train_sizes"]
+    train = lc["train_scores_mean"] * 100
+    test  = lc["test_scores_mean"]  * 100
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.plot(sizes, train, "o-", color="steelblue", label="Tréninková sada")
+    ax.plot(sizes, test,  "s-", color="darkorange", label="Testovací sada")
+    ax.set_xlabel("Počet trénovacích vzorků")
+    ax.set_ylabel("Přesnost (%)")
+    ax.set_title("Learning curve — potřeba ošetření půdy")
+    ax.set_ylim(50, 105)
+    ax.set_yticks(np.arange(50, 110, 10))
+    ax.legend(fontsize=10)
+    ax.grid(True)
+    plt.tight_layout()
+    plt.savefig("results/grafy/04_lc_treatment.png")
+    plt.close()
+    print("✓ 04_lc_treatment.png")
+
+
+def plot_fi_collision(results):
+    fi = pd.Series(results["out_collision_risk"]["feature_importance"]).nlargest(10)
+    rename = {
+        "lidar_min":         "LiDAR min. vzdálenost",
+        "depth_min":         "RGB-D min. hloubka",
+        "depth_center":      "RGB-D střed záběru",
+        "cam_obstacle":      "RGB-D překážka",
+        "lidar_N":           "LiDAR sever",
+        "lidar_front_clear": "LiDAR volná cesta",
+        "imu_roll":          "IMU boční náklon",
+        "imu_pitch":         "IMU náklon dopředu",
+        "soil_moisture":     "Vlhkost půdy",
+        "soil_ph":           "pH půdy",
     }
+    labels = [rename.get(k, k) for k in fi.index]
 
-    for ax, (target, lc) in zip(axes, lc_results.items()):
-        title, ylabel = rename_target[target]
-        sizes = lc["train_sizes"]
-        train = lc["train_scores_mean"].copy()
-        test  = lc["test_scores_mean"].copy()
-
-        if "%" in ylabel:
-            train *= 100
-            test  *= 100
-
-        ax.plot(sizes, train, "o-", color=COLORS["primary"],
-                label="Tréninková sada", linewidth=2, markersize=5)
-        ax.plot(sizes, test, "s--", color=COLORS["accent"],
-                label="Testovací sada", linewidth=2, markersize=5)
-
-        diff = np.abs(train - test)
-        opt_idx = np.argmin(diff[len(diff)//2:]) + len(diff)//2
-        ax.axvline(sizes[opt_idx], color=COLORS["secondary"],
-                   linestyle=":", alpha=0.7, label=f"Optimum ~{sizes[opt_idx]:,.0f}")
-        ax.fill_between(sizes, train, test, alpha=0.08, color=COLORS["secondary"])
-
-        ax.set_title(title, fontweight="bold", pad=10)
-        ax.set_xlabel("Počet trénovacích vzorků")
-        ax.set_ylabel(ylabel)
-        ax.legend(fontsize=9)
-        ax.grid(axis="y", alpha=0.3)
-
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.barh(labels[::-1], fi.values[::-1], color="steelblue", height=0.6)
+    ax.set_xlabel("Relativní důležitost")
+    ax.set_title("Důležitost senzorů — riziko kolize")
+    ax.set_xlim(0, fi.values.max() * 1.15)
+    ax.grid(axis="x", alpha=0.4, linestyle="--")
     plt.tight_layout()
-    plt.savefig("results/grafy/02_learning_curves.png")
+    plt.savefig("results/grafy/05_fi_collision.png")
     plt.close()
-    print("✓ 02_learning_curves.png")
+    print("✓ 05_fi_collision.png")
 
 
-def plot_predictions_vs_real(results):
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    fig.suptitle("Přesnost predikce — surrogate vs. simulace",
-                 fontsize=14, fontweight="bold")
+def plot_fi_speed(results):
+    fi = pd.Series(results["out_speed"]["feature_importance"]).nlargest(10)
+    rename = {
+        "lidar_front_clear": "LiDAR volná cesta",
+        "lidar_N":           "LiDAR sever",
+        "rtk_fix":           "RTK kvalita fixu",
+        "lidar_min":         "LiDAR min. vzdálenost",
+        "imu_pitch":         "IMU náklon dopředu",
+        "imu_roll":          "IMU boční náklon",
+        "depth_center":      "RGB-D střed záběru",
+        "depth_min":         "RGB-D min. hloubka",
+        "soil_moisture":     "Vlhkost půdy",
+        "soil_ph":           "pH půdy",
+    }
+    labels = [rename.get(k, k) for k in fi.index]
 
-    for ax, target, title in zip(
-        axes,
-        ["out_collision_risk", "out_speed"],
-        ["Riziko kolize", "Optimální rychlost"]
-    ):
-        y_test = results[target]["y_test"]
-        y_pred = results[target]["y_pred"]
-        r2     = results[target].get("r2", 0)
-
-        idx = np.random.choice(len(y_test), min(1000, len(y_test)), replace=False)
-        yt, yp = y_test[idx], y_pred[idx]
-
-        ax.scatter(yt, yp, alpha=0.25, s=12, color=COLORS["primary"])
-        lims = [min(yt.min(), yp.min()) - 0.05, max(yt.max(), yp.max()) + 0.05]
-        ax.plot(lims, lims, "--", color=COLORS["accent"],
-                linewidth=1.5, label="Ideální shoda")
-
-        ax.set_title(f"{title}  (R² = {r2:.3f})", fontweight="bold", pad=10)
-        ax.set_xlabel("Skutečná hodnota (simulace)")
-        ax.set_ylabel("Predikce (surrogate)")
-        ax.set_xlim(lims); ax.set_ylim(lims)
-        ax.legend(fontsize=9)
-
+    fig, ax = plt.subplots(figsize=(7, 5))
+    ax.barh(labels[::-1], fi.values[::-1], color="steelblue", height=0.6)
+    ax.set_xlabel("Relativní důležitost")
+    ax.set_title("Důležitost senzorů — optimální rychlost")
+    ax.set_xlim(0, fi.values.max() * 1.15)
+    ax.grid(axis="x", alpha=0.4, linestyle="--")
     plt.tight_layout()
-    plt.savefig("results/grafy/03_predictions_scatter.png")
+    plt.savefig("results/grafy/06_fi_speed.png")
     plt.close()
-    print("✓ 03_predictions_scatter.png")
+    print("✓ 06_fi_speed.png")
 
 
-def plot_latency_benchmark(results):
-    fig, ax = plt.subplots(figsize=(9, 4))
-    fig.suptitle("Rychlost inference — surrogate vs. simulace",
-                 fontsize=14, fontweight="bold")
+def plot_hist_collision(results):
+    y_test = results["out_collision_risk"]["y_test"]
+    y_pred = results["out_collision_risk"]["y_pred"]
 
-    labels = [
-        "Plná simulace\n(odhad Gazebo)",
-        "Surrogate\nriziko kolize",
-        "Surrogate\nrychlost",
-        "Surrogate\nošetření půdy",
-        "Surrogate\nkvalita GPS",
-    ]
-    times_ms = [
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.hist(y_test, bins=30, alpha=0.6, color="steelblue", label="Simulace (skutečnost)")
+    ax.hist(y_pred, bins=30, alpha=0.6, color="darkorange", label="Surrogate (predikce)")
+    ax.set_xlabel("Riziko kolize")
+    ax.set_ylabel("Počet vzorků")
+    ax.set_title("Distribuce rizika kolize")
+    ax.set_xticks(np.arange(0, 1.2, 0.2))
+    ax.legend(fontsize=10)
+    ax.grid(True)
+    plt.tight_layout()
+    plt.savefig("results/grafy/07_hist_collision.png")
+    plt.close()
+    print("✓ 07_hist_collision.png")
+
+
+def plot_hist_speed(results):
+    y_test = results["out_speed"]["y_test"]
+    y_pred = results["out_speed"]["y_pred"]
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.hist(y_test, bins=30, alpha=0.6, color="steelblue", label="Simulace (skutečnost)")
+    ax.hist(y_pred, bins=30, alpha=0.6, color="darkorange", label="Surrogate (predikce)")
+    ax.set_xlabel("Optimální rychlost (normalizovaná)")
+    ax.set_ylabel("Počet vzorků")
+    ax.set_title("Distribuce optimální rychlosti")
+    ax.set_xticks(np.arange(0, 1.2, 0.2))
+    ax.legend(fontsize=10)
+    ax.grid(True)
+    plt.tight_layout()
+    plt.savefig("results/grafy/08_hist_speed.png")
+    plt.close()
+    print("✓ 08_hist_speed.png")
+
+
+def plot_residuals_collision(results):
+    y_test = results["out_collision_risk"]["y_test"]
+    y_pred = results["out_collision_risk"]["y_pred"]
+    residuals = y_pred - y_test
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.scatter(y_test, residuals, s=6, alpha=0.3, color="steelblue")
+    ax.axhline(0, color="red", linestyle="--", linewidth=1.2)
+    ax.set_xlabel("Skutečná hodnota")
+    ax.set_ylabel("Chyba predikce (predikce − skutečnost)")
+    ax.set_title("Residuály — riziko kolize")
+    ax.set_xticks(np.arange(0, 1.2, 0.2))
+    ax.grid(True)
+    plt.tight_layout()
+    plt.savefig("results/grafy/09_residuals_collision.png")
+    plt.close()
+    print("✓ 09_residuals_collision.png")
+
+
+def plot_residuals_speed(results):
+    y_test = results["out_speed"]["y_test"]
+    y_pred = results["out_speed"]["y_pred"]
+    residuals = y_pred - y_test
+
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.scatter(y_test, residuals, s=6, alpha=0.3, color="steelblue")
+    ax.axhline(0, color="red", linestyle="--", linewidth=1.2)
+    ax.set_xlabel("Skutečná hodnota")
+    ax.set_ylabel("Chyba predikce (predikce − skutečnost)")
+    ax.set_title("Residuály — optimální rychlost")
+    ax.set_xticks(np.arange(0, 1.2, 0.2))
+    ax.grid(True)
+    plt.tight_layout()
+    plt.savefig("results/grafy/10_residuals_speed.png")
+    plt.close()
+    print("✓ 10_residuals_speed.png")
+
+
+def plot_latency(results):
+    labels = ["Plná simulace\n(Gazebo)", "Kolize", "Rychlost", "Ošetření půdy", "Kvalita GPS"]
+    times  = [
         500.0,
         results["out_collision_risk"]["inference_ms"],
         results["out_speed"]["inference_ms"],
         results["out_needs_treatment"]["inference_ms"],
         results["out_nav_quality"]["inference_ms"],
     ]
-    bar_colors = [COLORS["accent"]] + [COLORS["primary"]] * 4
 
-    bars = ax.bar(labels, times_ms, color=bar_colors, width=0.5, alpha=0.9)
-    for bar, t in zip(bars, times_ms):
-        label = f"{t:.0f} ms" if t >= 1 else f"{t:.3f} ms"
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 5,
-                label, ha="center", va="bottom", fontsize=10, fontweight="bold")
-
-    ax.set_ylabel("Latence [ms]  (log škála)")
+    fig, ax = plt.subplots(figsize=(7, 5))
+    bars = ax.bar(labels, times, color=["darkorange"] + ["steelblue"] * 4, width=0.5)
+    for bar, t in zip(bars, times):
+        label = f"{t:.0f} ms" if t >= 1 else f"{t:.2f} ms"
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 8,
+                label, ha="center", va="bottom", fontsize=10)
+    ax.set_ylabel("Latence [ms] (log škála)")
     ax.set_yscale("log")
-    ax.set_ylim(0.0001, 2000)
-    ax.axhline(16.67, color=COLORS["secondary"], linestyle="--",
-               alpha=0.6, label="60 FPS limit (16.67 ms)")
-    ax.legend(fontsize=9)
-    ax.grid(axis="y", alpha=0.3, which="both")
-
+    ax.set_ylim(0.001, 3000)
+    ax.axhline(16.67, color="gray", linestyle="--", linewidth=1,
+               label="60 FPS limit (16.67 ms)")
+    ax.set_title("Latence inference — surrogate vs. plná simulace")
+    ax.legend(fontsize=10)
+    ax.grid(axis="y", alpha=0.4, linestyle="--", which="both")
     plt.tight_layout()
-    plt.savefig("results/grafy/04_latency_benchmark.png")
+    plt.savefig("results/grafy/11_latency.png")
     plt.close()
-    print("✓ 04_latency_benchmark.png")
-
-
-def plot_summary_table(results):
-    fig, ax = plt.subplots(figsize=(11, 3.5))
-    ax.axis("off")
-    fig.suptitle("Souhrn výsledků Surrogate Modelu",
-                 fontsize=14, fontweight="bold")
-
-    rename = {
-        "out_collision_risk":  "Riziko kolize",
-        "out_speed":           "Optimální rychlost",
-        "out_needs_treatment": "Potřeba ošetření",
-        "out_nav_quality":     "Kvalita navigace",
-    }
-
-    rows = []
-    for target, r in results.items():
-        acc_str = f"R² = {r['r2']:.4f}" if r["model_type"] == "regressor" \
-                  else f"{r['accuracy']*100:.2f}%"
-        rows.append([
-            rename[target],
-            r["model_type"].capitalize(),
-            acc_str,
-            f"{r['train_time_s']:.2f} s",
-            f"{r['inference_ms']:.4f} ms",
-        ])
-
-    col_labels = ["Výstup", "Typ modelu", "Přesnost", "Čas tréninku", "Inference"]
-    table = ax.table(cellText=rows, colLabels=col_labels,
-                     loc="center", cellLoc="center")
-    table.auto_set_font_size(False)
-    table.set_fontsize(10)
-    table.scale(1.2, 2.0)
-
-    for j in range(len(col_labels)):
-        table[0, j].set_facecolor(COLORS["primary"])
-        table[0, j].set_text_props(color="white", fontweight="bold")
-    for i in range(1, len(rows)+1):
-        for j in range(len(col_labels)):
-            table[i, j].set_facecolor("#F8F9FA" if i % 2 == 0 else "white")
-
-    plt.savefig("results/grafy/05_summary_table.png")
-    plt.close()
-    print("✓ 05_summary_table.png")
+    print("✓ 11_latency.png")
 
 
 if __name__ == "__main__":
-    print("Načítám výsledky tréninku...")
+    print("Načítám výsledky...")
     results = joblib.load("results/training_results.pkl")
     lc      = joblib.load("results/learning_curves.pkl")
 
     print("\nGeneruji grafy:")
-    plot_feature_importance(results)
-    plot_learning_curves(lc)
-    plot_predictions_vs_real(results)
-    plot_latency_benchmark(results)
-    plot_summary_table(results)
+    plot_scatter_collision(results)
+    plot_scatter_speed(results)
+    plot_lc_collision(lc)
+    plot_lc_treatment(lc)
+    plot_fi_collision(results)
+    plot_fi_speed(results)
+    plot_hist_collision(results)
+    plot_hist_speed(results)
+    plot_residuals_collision(results)
+    plot_residuals_speed(results)
+    plot_latency(results)
 
-    print("\n✓ Hotovo — results/grafy/")
+    print(f"\n✓ Hotovo — 11 grafů v results/grafy/")
