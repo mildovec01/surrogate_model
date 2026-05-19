@@ -36,7 +36,7 @@ RF_PARAMS = dict(
 
 def train_all(csv_path="data/robot_simulation.csv"):
     print("=" * 55)
-    print("  SURROGATE MODEL — TRÉNINK")
+    print("  SURROGATE MODEL - TRAINING")
     print("=" * 55)
 
     df = pd.read_csv(csv_path)
@@ -47,7 +47,7 @@ def train_all(csv_path="data/robot_simulation.csv"):
     results = {}
 
     for target, model_type in TARGETS.items():
-        print(f"\n▶ {target} ({model_type})")
+        print(f"\n{target} ({model_type})")
         y = df[target]
 
         X_train, X_test, y_train, y_test = train_test_split(
@@ -76,7 +76,7 @@ def train_all(csv_path="data/robot_simulation.csv"):
             print(classification_report(y_test, y_pred, digits=3))
             metrics = {"accuracy": acc}
 
-        print(f"  Čas tréninku: {train_time:.2f}s")
+        print(f"   Training time: {train_time:.2f}s")
 
         single = X_test.iloc[[0]]
         runs = 1000
@@ -108,14 +108,14 @@ def train_all(csv_path="data/robot_simulation.csv"):
         }
 
     joblib.dump(results, "results/training_results.pkl")
-    print("\n✓ Modely uloženy do models/")
-    print("✓ Výsledky uloženy do results/training_results.pkl")
+    print("\nModels saved to models/")
+    print("Results saved to results/training_results.pkl")
 
     return results
 
 
 def compute_learning_curves(csv_path="data/robot_simulation.csv"):
-    print("\nPočítám learning curves...")
+    print("\nCounting learning curves")
     df = pd.read_csv(csv_path)
     X = df[FEATURES]
 
@@ -146,7 +146,7 @@ def compute_learning_curves(csv_path="data/robot_simulation.csv"):
         print(f"  ✓ {target}")
 
     joblib.dump(lc_results, "results/learning_curves.pkl")
-    print("✓ Learning curves uloženy")
+    print("Learning curves saved")
     return lc_results
 
 

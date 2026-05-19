@@ -101,7 +101,7 @@ def compute_labels(lidar_min, lidar_N, depth_min, imu_pitch, imu_roll,
 
 
 def generate_dataset(n=N):
-    print(f"Generuji {n:,} simulačních vzorků...")
+    print(f"Generating {n:,} simulation samples...")
 
     pos_x, pos_y, soil_moisture, soil_ph = generate_field_map(n)
     lidar = generate_lidar(n)
@@ -131,10 +131,10 @@ def generate_dataset(n=N):
     Path("data").mkdir(exist_ok=True)
     df.to_csv("data/robot_simulation.csv", index=False)
 
-    print(f"✓ Dataset uložen: data/robot_simulation.csv")
-    print(f"  Vzorků:  {len(df):,}")
-    print(f"  Featury: {len([c for c in df.columns if not c.startswith('out_')])}")
-    print(f"  Labely:  {len([c for c in df.columns if c.startswith('out_')])}")
+    print(f"✓ Data saved: data/robot_simulation.csv")
+    print(f"  Samples:  {len(df):,}")
+    print(f"  Features: {len([c for c in df.columns if not c.startswith('out_')])}")
+    print(f"  Labels:  {len([c for c in df.columns if c.startswith('out_')])}")
 
     return df
 
